@@ -8,7 +8,9 @@
 | `freedomspeech.postman_collection.json` | Postman-коллекция v2.1, по одному запросу на эндпоинт, переменные `baseUrl` и `apiKey` |
 | этот README | как пользоваться и описание WebSocket-протоколов `/ws/asr` и `/ws/tts` (в OpenAPI их нет) |
 
-Базовый адрес: `https://freedomspeech.kz`. Ключ выдаётся в личном кабинете.
+Базовый адрес: `https://api.freedomspeech.kz`. Ключ выдаётся в личном кабинете.
+
+Ключ из кабинета console.freedomspeech.kz работает на https://api.freedomspeech.kz, это адрес по умолчанию с 18.10.2026. На нём опубликованы `POST /v1/audio/transcriptions`, `POST /v1/audio/speech`, `WS /ws/asr` и `WS /ws/tts`. Остальные маршруты из `freedomspeech.yaml` (клонирование, voice design, перевод, каталог голосов, health) на этом адресе пока не опубликованы (404, бэкенд в работе) и ключам кабинета недоступны.
 
 ## Как пользоваться
 
@@ -57,7 +59,7 @@ Postman: `File > Import`, выбрать `freedomspeech.postman_collection.json`
 
 ## WebSocket: потоковое распознавание `/ws/asr`
 
-Адрес: `wss://freedomspeech.kz/ws/asr?apiKey=<ключ>&prettify=false`
+Адрес: `wss://api.freedomspeech.kz/ws/asr?apiKey=<ключ>&prettify=false`
 
 Ключ передаётся в query-параметре `apiKey`. `prettify=true` включает расстановку пунктуации в итоговом тексте.
 
@@ -91,7 +93,7 @@ Postman: `File > Import`, выбрать `freedomspeech.postman_collection.json`
 Пример на JavaScript (браузер):
 
 ```js
-const ws = new WebSocket(`wss://freedomspeech.kz/ws/asr?apiKey=${key}&prettify=true`);
+const ws = new WebSocket(`wss://api.freedomspeech.kz/ws/asr?apiKey=${key}&prettify=true`);
 ws.binaryType = "arraybuffer";
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
@@ -105,7 +107,7 @@ ws.onmessage = (ev) => {
 
 ## WebSocket: потоковый синтез `/ws/tts`
 
-Адрес: `wss://freedomspeech.kz/ws/tts?apiKey=<ключ>`
+Адрес: `wss://api.freedomspeech.kz/ws/tts?apiKey=<ключ>`
 
 Одно соединение обслуживает несколько запросов подряд. Каждый запрос помечается `requestId`, ответы несут тот же `requestId`.
 Очередь на одном соединении: до 8 запросов; запрос ждёт своей очереди до 60 секунд, потом приходит `error` с `code: "queue_timeout"`.
@@ -144,7 +146,7 @@ ws.onmessage = (ev) => {
 Пример на JavaScript (браузер, воспроизведение через Web Audio):
 
 ```js
-const ws = new WebSocket(`wss://freedomspeech.kz/ws/tts?apiKey=${key}`);
+const ws = new WebSocket(`wss://api.freedomspeech.kz/ws/tts?apiKey=${key}`);
 const ctx = new AudioContext({ sampleRate: 24000 });
 let t = ctx.currentTime;
 ws.onopen = () => ws.send(JSON.stringify({ type: "synthesize", text: "Сәлеметсіз бе!", voice: "tomiris", requestId: "req-1" }));
@@ -174,7 +176,9 @@ Files in this folder:
 | `freedomspeech.postman_collection.json` | Postman collection v2.1, one request per endpoint, variables `baseUrl` and `apiKey` |
 | this README | usage notes and the WebSocket protocols `/ws/asr` and `/ws/tts` (not part of OpenAPI) |
 
-Base URL: `https://freedomspeech.kz`. API keys are issued in the account dashboard.
+Base URL: `https://api.freedomspeech.kz`. API keys are issued in the account dashboard.
+
+Keys from the console.freedomspeech.kz dashboard work on https://api.freedomspeech.kz, the default since 2026-10-18. Published there: `POST /v1/audio/transcriptions`, `POST /v1/audio/speech`, `WS /ws/asr`, `WS /ws/tts`. The other routes in `freedomspeech.yaml` (cloning, voice design, translation, voice catalog, health) are not published on that host yet (404, backend work in progress) and are not available to console keys.
 
 ## Usage
 
@@ -222,7 +226,7 @@ Error body: `{"detail": "..."}` or `{"error": "..."}`.
 
 ## WebSocket: streaming recognition `/ws/asr`
 
-URL: `wss://freedomspeech.kz/ws/asr?apiKey=<key>&prettify=false`
+URL: `wss://api.freedomspeech.kz/ws/asr?apiKey=<key>&prettify=false`
 
 The key goes in the `apiKey` query parameter. `prettify=true` adds punctuation to final text.
 
@@ -255,7 +259,7 @@ An authentication failure arrives either as an `error` frame or as a rejected up
 
 ## WebSocket: streaming synthesis `/ws/tts`
 
-URL: `wss://freedomspeech.kz/ws/tts?apiKey=<key>`
+URL: `wss://api.freedomspeech.kz/ws/tts?apiKey=<key>`
 
 One connection serves many requests. Each request carries a `requestId`; every reply echoes it.
 Queue per connection: up to 8 requests; a request waits up to 60 seconds, then an `error` with `code: "queue_timeout"` is sent.

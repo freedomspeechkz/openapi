@@ -26,8 +26,8 @@ externalDocs:
   description: API documentation
   url: https://freedomspeech.kz/docs
 servers:
-  - url: https://freedomspeech.kz
-    description: Production
+  - url: https://api.freedomspeech.kz
+    description: Production. Ключи из кабинета console.freedomspeech.kz работают здесь; опубликованы /v1/audio/transcriptions, /v1/audio/speech и WebSocket /ws/asr, /ws/tts. Остальные маршруты на этом адресе пока не опубликованы. / Console keys work here; only /v1/audio/* and the WebSockets are published so far.
 security:
   - apiKey: []
   - bearer: []
