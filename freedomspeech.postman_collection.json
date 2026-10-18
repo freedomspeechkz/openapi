@@ -1,0 +1,453 @@
+{
+  "info": {
+    "_postman_id": "b10bc48b-b4cf-542d-9838-df774574e36f",
+    "name": "Freedom Speech API",
+    "description": "HTTP-эндпоинты API Freedom Speech (https://freedomspeech.kz/docs). Переменные: baseUrl, apiKey. Аутентификация: заголовок X-API-Key; на некоторых установках принимается также Authorization: Bearer. Потоковые WS /ws/asr и /ws/tts в коллекции нет: протокол описан в README рядом с OpenAPI-файлом.\n\nHTTP endpoints of the Freedom Speech API. Variables: baseUrl, apiKey. Auth: X-API-Key header (Bearer accepted on some deployments only). Streaming WS endpoints are described in the README next to the OpenAPI file.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-API-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{apiKey}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://freedomspeech.kz",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "string",
+      "description": "Ключ API; выдаётся через форму на https://freedomspeech.kz"
+    }
+  ],
+  "item": [
+    {
+      "name": "Recognition",
+      "item": [
+        {
+          "name": "Transcribe (POST /v1/audio/transcriptions)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/audio/transcriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "audio",
+                "transcriptions"
+              ]
+            },
+            "description": "Распознать файл целиком. Язык определяется автоматически (kk, ru, en). Ответ: text, duration, processingTime, language, segments при diarized_json.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "description": "Аудиофайл: wav, mp3, ogg, oga, m4a, flac, webm, mp4, opus",
+                  "src": ""
+                },
+                {
+                  "key": "prettify",
+                  "type": "text",
+                  "description": "true правит числа и даты; false даёт сырой выход для WER",
+                  "value": "true"
+                },
+                {
+                  "key": "response_format",
+                  "type": "text",
+                  "description": "Уберите поле, если говорящие не нужны",
+                  "value": "diarized_json"
+                },
+                {
+                  "key": "known_speaker_names[]",
+                  "type": "text",
+                  "description": "Подписи говорящих, до 4",
+                  "value": "Оператор"
+                },
+                {
+                  "key": "known_speaker_names[]",
+                  "type": "text",
+                  "description": "",
+                  "value": "Клиент"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Synthesis",
+      "item": [
+        {
+          "name": "Speak (POST /v1/audio/speech)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/audio/speech",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "audio",
+                "speech"
+              ]
+            },
+            "description": "Озвучить текст. Ответ: WAV 16 бит моно 24 кГц (в Postman: Send and Download). Поля emotion (только tomiris) и model необязательны; flash доступна по WS /ws/tts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"Сәлеметсіз бе, бұл сынақ.\",\n  \"voice\": \"tomiris\",\n  \"language\": \"kk\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Voices",
+      "item": [
+        {
+          "name": "List voices (GET /api/voices)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/voices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voices"
+              ]
+            },
+            "description": "Без ключа. id голоса подставляется в voice (синтез) и voice_id (клонирование).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Voice preview (GET /api/voices/{id}/preview)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/voices/alikhan_kz/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voices",
+                "alikhan_kz",
+                "preview"
+              ]
+            },
+            "description": "Без ключа. WAV-образец голоса каталога; у встроенных голосов 404.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clone voice (POST /api/voice-clone)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/voice-clone",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voice-clone"
+              ]
+            },
+            "description": "Озвучить текст голосом из записи или голосом каталога. Ответ: WAV. Ожидание до 180 с.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "text",
+                  "type": "text",
+                  "description": "",
+                  "value": "Сәлеметсіз бе, қалыңыз қалай?"
+                },
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Референс до 20 с: WAV, MP3, OGG, M4A, FLAC, WebM. Либо audio, либо voice_id",
+                  "src": ""
+                },
+                {
+                  "key": "voice_id",
+                  "type": "text",
+                  "description": "Вместо записи: id голоса каталога или tomiris (уберите audio)",
+                  "value": ""
+                },
+                {
+                  "key": "language",
+                  "type": "text",
+                  "description": "",
+                  "value": "kk"
+                },
+                {
+                  "key": "speed",
+                  "type": "text",
+                  "description": "Множитель темпа; при заданной duration игнорируется",
+                  "value": "1.0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clone voice, all engines (POST /api/voice-clone?variants=all)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/voice-clone?variants=all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voice-clone"
+              ],
+              "query": [
+                {
+                  "key": "variants",
+                  "value": "all"
+                }
+              ]
+            },
+            "description": "То же, но JSON с результатом каждого движка: variants[{engine: omnivoice|flash, wav_base64}].",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "text",
+                  "type": "text",
+                  "description": "",
+                  "value": "Сәлеметсіз бе, қалыңыз қалай?"
+                },
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "description": "Референс до 20 с",
+                  "src": ""
+                },
+                {
+                  "key": "language",
+                  "type": "text",
+                  "description": "",
+                  "value": "kk"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Design voice (POST /api/voice-design)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/voice-design",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "voice-design"
+              ]
+            },
+            "description": "Создать голос по описанию и озвучить им текст. Ответ: reference_wav_base64, voice_clone_wav_base64, variants.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Сәлеметсіз бе, қош келдіңіз.\",\n  \"instruct\": \"A calm adult male voice, medium pitch, slow pace, warm timbre\",\n  \"language\": \"kk\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Translation",
+      "item": [
+        {
+          "name": "Translate (POST /v2/translate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/translate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "translate"
+              ]
+            },
+            "description": "До 50 строк. source_lang необязателен: без него язык определяется и возвращается в detected_source_language.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": [\n    \"Привет, мир\",\n    \"Как дела?\"\n  ],\n  \"target_lang\": \"kk\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detect language (POST /v2/detect)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v2/detect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "detect"
+              ]
+            },
+            "description": "До 50 строк. Ответ: detections[{text, detected_source_language}].",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": [\n    \"Сәлем\",\n    \"Hello\",\n    \"Привет\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Languages (GET /v2/languages)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v2/languages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "languages"
+              ]
+            },
+            "description": "Без ключа. Языки перевода: kk, ru, en.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Service",
+      "item": [
+        {
+          "name": "ASR health (GET /api/asr/health)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/asr/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "asr",
+                "health"
+              ]
+            },
+            "description": "Без ключа. 200 {status: healthy} или 503 {status: unavailable}.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

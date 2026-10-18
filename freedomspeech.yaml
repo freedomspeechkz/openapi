@@ -1,0 +1,739 @@
+openapi: 3.1.0
+info:
+  title: Freedom Speech API
+  version: "2026-10-17"
+  summary: Kazakh, Russian and English speech recognition, synthesis, voice cloning and translation
+  description: |
+    HTTP-эндпоинты API Freedom Speech, описанные в публичной документации https://freedomspeech.kz/docs
+    и в официальных SDK (`freedomspeech` для Python и JavaScript). Потоковые эндпоинты `WS /ws/asr`
+    и `WS /ws/tts` в OpenAPI не описываются: их протокол с примерами кадров приведён в README рядом
+    с этим файлом.
+
+    HTTP endpoints of the Freedom Speech API as documented at https://freedomspeech.kz/docs and
+    implemented by the official SDKs (`freedomspeech` for Python and JavaScript). The streaming
+    endpoints `WS /ws/asr` and `WS /ws/tts` are out of OpenAPI scope; their frame protocol is
+    described in the README next to this file.
+
+    Аутентификация: заголовок `X-API-Key`. Публичные эндпоинты без ключа: `GET /api/voices`,
+    `GET /api/voices/{id}/preview`, `GET /v2/languages`, `GET /api/asr/health`.
+  contact:
+    name: Freedom Speech
+    url: https://freedomspeech.kz
+  license:
+    name: MIT
+    identifier: MIT
+externalDocs:
+  description: API documentation
+  url: https://freedomspeech.kz/docs
+servers:
+  - url: https://freedomspeech.kz
+    description: Production
+security:
+  - apiKey: []
+  - bearer: []
+tags:
+  - name: Recognition
+    description: Speech to text
+  - name: Synthesis
+    description: Text to speech
+  - name: Voices
+    description: Voice catalog, voice cloning and voice design
+  - name: Translation
+    description: Text translation and language detection
+  - name: Service
+    description: Health
+
+paths:
+  /v1/audio/transcriptions:
+    post:
+      tags: [Recognition]
+      operationId: transcribe
+      summary: Распознать аудиофайл / Transcribe an audio file
+      description: |
+        OpenAI-совместимый эндпоинт. Язык определяется автоматически (kk, ru, en).
+        Форматы файла: wav, mp3, ogg, oga, m4a, flac, webm, mp4, opus.
+        С `response_format=diarized_json` ответ содержит `segments` с говорящими и таймкодами.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/TranscriptionRequest"
+            encoding:
+              file:
+                contentType: audio/*, application/octet-stream
+              known_speaker_names[]:
+                style: form
+                explode: true
+      responses:
+        "200":
+          description: Стенограмма / Transcript
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transcription"
+              examples:
+                plain:
+                  summary: Обычный ответ
+                  value:
+                    text: "Сәлеметсіз бе, бұл сынақ."
+                    duration: 2.9
+                    processingTime: 0.41
+                    language: kk
+                diarized:
+                  summary: response_format=diarized_json
+                  value:
+                    task: transcribe
+                    text: "Agent: Сәлеметсіз бе\nClient: Сәлем"
+                    duration: 12.5
+                    language: kk
+                    segments:
+                      - type: transcript.text.segment
+                        id: seg_001
+                        start: 1.128
+                        end: 3.512
+                        text: "Сәлеметсіз бе"
+                        speaker: Agent
+                      - type: transcript.text.segment
+                        id: seg_002
+                        start: 4.232
+                        end: 11.448
+                        text: "Сәлем"
+                        speaker: Client
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/PaymentRequired" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /v1/audio/speech:
+    post:
+      tags: [Synthesis]
+      operationId: speak
+      summary: Озвучить текст / Synthesize speech
+      description: |
+        OpenAI-совместимый эндпоинт. Ответ: WAV, 16 бит, моно, 24 кГц, модель `freedomspeech`.
+        Модель `freedomspeech-flash` доступна по `WS /ws/tts` (см. README).
+        В тексте допустимы теги просодии `<pause>`, `<louder>...</louder>`, `<slower>...</slower>`;
+        у голоса `tomiris` ещё неречевые `<sigh>`, `<laugh>` и другие. Незакрытый тег даёт 400.
+        Лимит текста: 2000 символов у демо-ключа сайта; для выданных ключей согласуется при выдаче.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeechRequest"
+            example:
+              input: "Сәлеметсіз бе, бұл сынақ."
+              voice: tomiris
+              language: kk
+      responses:
+        "200":
+          description: WAV-файл / WAV audio (16-bit PCM, mono, 24 kHz)
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/PaymentRequired" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/voices:
+    get:
+      tags: [Voices]
+      operationId: listVoices
+      summary: Список голосов / List voices
+      description: Без ключа. `id` подставляется в `voice` (синтез) и `voice_id` (клонирование).
+      security: []
+      responses:
+        "200":
+          description: Голоса каталога / Catalog voices
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: "#/components/schemas/Voice" }
+                  - type: object
+                    properties:
+                      voices:
+                        type: array
+                        items: { $ref: "#/components/schemas/Voice" }
+              example:
+                - id: tomiris
+                  name: Tomiris
+                  type: builtin
+                - id: taymas
+                  name: Taymas
+                  type: builtin
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /api/voices/{voiceId}/preview:
+    get:
+      tags: [Voices]
+      operationId: voicePreview
+      summary: Образец голоса каталога / Voice preview
+      description: "Без ключа. У встроенных голосов образца нет (404): озвучьте фразу через `POST /v1/audio/speech`."
+      security: []
+      parameters:
+        - name: voiceId
+          in: path
+          required: true
+          schema: { type: string }
+          example: alikhan_kz
+      responses:
+        "200":
+          description: WAV-файл / WAV audio
+          content:
+            audio/wav:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /api/voice-clone:
+    post:
+      tags: [Voices]
+      operationId: cloneVoice
+      summary: Озвучить текст голосом из записи или голосом каталога / Voice cloning
+      description: |
+        Нужно ровно одно из `audio` (референс, рекомендуется до 20 с; WAV, MP3, OGG, M4A, FLAC, WebM)
+        и `voice_id` (id голоса каталога или `tomiris`). Не-WAV сервер конвертирует в 16 кГц моно сам.
+        Без `variants` ответ: WAV первого удачного движка. С `?variants=all` ответ: JSON с результатом
+        каждого движка (`omnivoice`, `flash`); упавший движок в списке отсутствует, 502 приходит,
+        только если упали все. Обработка может занимать десятки секунд: SDK ждут до 180 с.
+      parameters:
+        - name: variants
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all]
+          description: "`all`: вернуть JSON с результатом каждого движка"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/VoiceCloneRequest"
+            encoding:
+              audio:
+                contentType: audio/*, application/octet-stream
+      responses:
+        "200":
+          description: WAV (без `variants`) или JSON с вариантами (`variants=all`)
+          content:
+            audio/wav:
+              schema: { type: string, format: binary }
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceCloneVariants"
+              example:
+                variants:
+                  - engine: omnivoice
+                    wav_base64: "UklGRiQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQAAAAA="
+                  - engine: flash
+                    wav_base64: "UklGRiQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQAAAAA="
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/PaymentRequired" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "502": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /api/voice-design:
+    post:
+      tags: [Voices]
+      operationId: designVoice
+      summary: Создать голос по описанию и озвучить им текст / Voice design
+      description: |
+        `instruct`: описание голоса; по документации лучше работает по-английски, казахское описание
+        сервер переводит сам. Стоит указать пол, возраст, высоту, темп, эмоцию, тембр, сценарий.
+        В ответе `reference_wav_base64` (образец голоса, годится как референс для `/api/voice-clone`),
+        `variants` по движкам и `voice_clone_wav_base64` (первый удачный вариант, поле для старых клиентов).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceDesignRequest"
+            example:
+              text: "Сәлеметсіз бе, қош келдіңіз."
+              instruct: "A calm adult male voice, medium pitch, slow pace, warm timbre, audiobook narration"
+              language: kk
+      responses:
+        "200":
+          description: Спроектированный голос / Designed voice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceDesignResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/PaymentRequired" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+        "502": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /v2/translate:
+    post:
+      tags: [Translation]
+      operationId: translate
+      summary: Перевести строки между kk, ru, en / Translate
+      description: |
+        До 50 строк за запрос. Порядок и число результатов совпадают с входом.
+        `detected_source_language` заполнено, только если `source_lang` не передан.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslateRequest"
+            examples:
+              single:
+                value: { text: "Привет, мир", target_lang: kk }
+              batch:
+                value: { text: ["Привет", "Пока"], target_lang: kk, source_lang: ru }
+      responses:
+        "200":
+          description: Переводы / Translations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslateResponse"
+              example:
+                translations:
+                  - detected_source_language: ru
+                    text: "Сәлем, әлем"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/PaymentRequired" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /v2/detect:
+    post:
+      tags: [Translation]
+      operationId: detectLanguage
+      summary: Определить язык строк / Detect language
+      description: До 50 строк за запрос.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectRequest"
+            example: { text: ["Сәлем", "Hello"] }
+      responses:
+        "200":
+          description: Определённые языки / Detections
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectResponse"
+              example:
+                detections:
+                  - detected_source_language: kk
+                    text: "Сәлем"
+                  - detected_source_language: en
+                    text: "Hello"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/PaymentRequired" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /v2/languages:
+    get:
+      tags: [Translation]
+      operationId: listLanguages
+      summary: Языки перевода / Supported languages
+      description: Без ключа.
+      security: []
+      responses:
+        "200":
+          description: Языки / Languages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LanguagesResponse"
+              example:
+                source_languages:
+                  - { language: kk, name: Kazakh }
+                  - { language: ru, name: Russian }
+                  - { language: en, name: English }
+                target_languages:
+                  - { language: kk, name: Kazakh }
+                  - { language: ru, name: Russian }
+                  - { language: en, name: English }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /api/asr/health:
+    get:
+      tags: [Service]
+      operationId: asrHealth
+      summary: Состояние распознавания / ASR health
+      description: 'Без ключа. При недоступности сервиса код 503 с телом `{"status": "unavailable", ...}`.'
+      security: []
+      responses:
+        "200":
+          description: Сервис распознавания работает / ASR service is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+              example: { status: healthy, vad_pool_ready: true }
+        "503":
+          description: Сервис распознавания недоступен / ASR service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+              example: { status: unavailable, model_loaded: false }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Основной способ. Ключ выдаётся через форму на https://freedomspeech.kz. / Primary scheme.
+    bearer:
+      type: http
+      scheme: bearer
+      description: |
+        `Authorization: Bearer <ключ>`. Принимается не на всех установках; публичная документация
+        описывает только `X-API-Key`. SDK шлют Bearer только по флагу, вместе с `X-API-Key`.
+        Accepted on some deployments only; the public docs describe `X-API-Key` alone.
+
+  parameters: {}
+
+  responses:
+    BadRequest:
+      description: Неверный параметр, пустой текст, незакрытый тег / Bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Unclosed tag <louder>" }
+    Unauthorized:
+      description: Ключ не передан или не принят / Invalid or missing API key
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Invalid or missing API key" }
+    PaymentRequired:
+      description: Требуется оплата или исчерпан баланс / Payment required
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Payment required" }
+    NotFound:
+      description: Не найдено / Not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Voice preview not found" }
+    PayloadTooLarge:
+      description: Файл или текст больше лимита / Payload too large
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "File too large" }
+    TooManyRequests:
+      description: Превышен лимит запросов / Rate limited
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Too many requests" }
+    ServerError:
+      description: Внутренняя ошибка / Internal error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "TTS failed" }
+    ServiceUnavailable:
+      description: Речевой сервис временно недоступен / Speech service unavailable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: "Voice cloning failed", details: "Voice service is temporarily unavailable" }
+
+  schemas:
+    Error:
+      type: object
+      description: |
+        Тело ошибки. Главное сообщение в `error`, затем `message`, затем `details`; `code` машинный код,
+        если сервер его прислал. Некоторые ошибки прокси приходят как text/html без JSON.
+      properties:
+        error: { type: string }
+        message: { type: string }
+        details: { type: string }
+        code: { type: string }
+      additionalProperties: true
+
+    TranscriptionRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Аудиофайл (wav, mp3, ogg, oga, m4a, flac, webm, mp4, opus)
+        prettify:
+          type: string
+          enum: ["true", "false"]
+          default: "true"
+          description: "`true` правит именованные сущности, числа и даты; `false` даёт сырой выход для замера WER"
+        response_format:
+          type: string
+          enum: [json, diarized_json]
+          description: "`diarized_json` добавляет `segments` с говорящими и таймкодами"
+        known_speaker_names[]:
+          type: array
+          items: { type: string }
+          maxItems: 4
+          description: Подписи говорящих для диаризации. Для двух каналов первый на канал 0, второй на канал 1; для моно до 4 имён по порядку появления.
+        language:
+          type: string
+          enum: [kk, ru, en]
+          description: Подсказка языка. В публичной документации поля нет; эффект не проверен.
+        model:
+          type: string
+          description: Поле OpenAI-совместимости; можно не передавать.
+
+    Segment:
+      type: object
+      required: [text]
+      properties:
+        type: { type: string, examples: [transcript.text.segment] }
+        id: { type: string, examples: [seg_001] }
+        start: { type: number, description: Секунды от начала }
+        end: { type: number, description: Секунды от начала }
+        text: { type: string }
+        speaker: { type: string }
+      additionalProperties: true
+
+    Transcription:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, description: Стенограмма }
+        duration: { type: number, description: Длительность аудио, с }
+        processingTime: { type: number, description: Время обработки на сервере, с (может отсутствовать) }
+        language: { type: string, description: Определённый язык (kk, ru, en) }
+        task: { type: string, examples: [transcribe] }
+        segments:
+          type: array
+          description: Только при `response_format=diarized_json`
+          items: { $ref: "#/components/schemas/Segment" }
+      additionalProperties: true
+
+    SpeechRequest:
+      type: object
+      required: [input]
+      properties:
+        input:
+          type: string
+          description: Текст; допустимы теги просодии
+        voice:
+          type: string
+          default: tomiris
+          description: "`tomiris`, `taymas` или id из `GET /api/voices`; регистр не важен"
+        language:
+          type: string
+          enum: [kk, ru, en]
+          description: Подсказка языка (пропускает автоопределение)
+        emotion:
+          type: string
+          enum: [neutral, happy, sad, surprised, angry, fearful]
+          description: Только для tomiris; у других голосов игнорируется
+        model:
+          type: string
+          enum: [freedomspeech, freedomspeech-flash]
+          description: По HTTP работает модель `freedomspeech`; flash доступна по `WS /ws/tts`
+        response_format:
+          type: string
+          description: Не описан в документации; ответ всегда WAV
+
+    Voice:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, examples: [tomiris] }
+        name: { type: string, examples: [Tomiris] }
+        type:
+          type: string
+          enum: [builtin, custom]
+      additionalProperties: true
+
+    VoiceCloneRequest:
+      type: object
+      required: [text]
+      description: Нужно ровно одно из `audio` и `voice_id`
+      properties:
+        text: { type: string, description: Что сказать }
+        audio:
+          type: string
+          format: binary
+          description: Запись-референс (WAV, MP3, OGG, M4A, FLAC, WebM), рекомендуется до 20 с
+        voice_id:
+          type: string
+          description: Вместо записи; id голоса каталога или `tomiris`
+        language:
+          type: string
+          enum: [kk, ru, en]
+        speed:
+          type: number
+          default: 1.0
+          description: Множитель темпа; больше 1 быстрее, меньше 1 медленнее (основной движок)
+        duration:
+          type: number
+          description: Целевая длительность в секундах; при заданной `duration` `speed` игнорируется
+
+    CloneVariant:
+      type: object
+      required: [engine, wav_base64]
+      properties:
+        engine:
+          type: string
+          enum: [omnivoice, flash]
+          description: "`omnivoice`: модель freedomspeech; `flash`: freedomspeech-flash"
+        wav_base64:
+          type: string
+          contentEncoding: base64
+          contentMediaType: audio/wav
+
+    VoiceCloneVariants:
+      type: object
+      required: [variants]
+      properties:
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/CloneVariant" }
+      additionalProperties: true
+
+    VoiceDesignRequest:
+      type: object
+      required: [text, instruct]
+      properties:
+        text: { type: string, description: Что сказать }
+        instruct: { type: string, description: Описание голоса (лучше по-английски) }
+        language:
+          type: string
+          enum: [kk, ru, en]
+
+    VoiceDesignResponse:
+      type: object
+      properties:
+        reference_wav_base64:
+          type: string
+          contentEncoding: base64
+          contentMediaType: audio/wav
+          description: Образец спроектированного голоса; годится как референс для `/api/voice-clone`
+        voice_clone_wav_base64:
+          type: string
+          contentEncoding: base64
+          contentMediaType: audio/wav
+          description: Первый удачный вариант (поле для старых клиентов)
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/CloneVariant" }
+      additionalProperties: true
+
+    TextOrList:
+      oneOf:
+        - type: string
+        - type: array
+          items: { type: string }
+          maxItems: 50
+
+    TranslateRequest:
+      type: object
+      required: [text, target_lang]
+      properties:
+        text: { $ref: "#/components/schemas/TextOrList" }
+        target_lang:
+          type: string
+          enum: [kk, ru, en]
+        source_lang:
+          type: string
+          enum: [kk, ru, en]
+          description: Если не передан, язык определяется и возвращается в `detected_source_language`
+
+    Translation:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+        detected_source_language: { type: string }
+
+    TranslateResponse:
+      type: object
+      required: [translations]
+      properties:
+        translations:
+          type: array
+          items: { $ref: "#/components/schemas/Translation" }
+
+    DetectRequest:
+      type: object
+      required: [text]
+      properties:
+        text: { $ref: "#/components/schemas/TextOrList" }
+
+    Detection:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+        detected_source_language: { type: string }
+
+    DetectResponse:
+      type: object
+      required: [detections]
+      properties:
+        detections:
+          type: array
+          items: { $ref: "#/components/schemas/Detection" }
+
+    Language:
+      type: object
+      properties:
+        language: { type: string, examples: [kk] }
+        name: { type: string, examples: [Kazakh] }
+
+    LanguagesResponse:
+      type: object
+      properties:
+        source_languages:
+          type: array
+          items: { $ref: "#/components/schemas/Language" }
+        target_languages:
+          type: array
+          items: { $ref: "#/components/schemas/Language" }
+      additionalProperties: true
+
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [healthy, unavailable]
+        vad_pool_ready: { type: boolean }
+        model_loaded: { type: boolean }
+      additionalProperties: true
